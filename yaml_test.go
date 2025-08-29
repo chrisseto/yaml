@@ -63,6 +63,10 @@ var (
 	}
 )
 
+func ptr[T any](t T) *T {
+	return &t
+}
+
 func testUnmarshal(t *testing.T, f testUnmarshalFunc, tests map[string]unmarshalTestCase) {
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
@@ -248,6 +252,15 @@ type UnmarshalEmbedRecursiveStruct struct {
 	B                              string `json:"b"`
 }
 
+type UnmarshalPointerField struct {
+	A UnmarshalStruct `json:"a"`
+	B *string         `json:"b"`
+}
+
+type UnmarshalOnlyEmbedStruct struct {
+	UnmarshalPointerField
+}
+
 func TestUnmarshal(t *testing.T) {
 	tests := map[string]unmarshalTestCase{
 		// casematched / non-casematched untagged keys
@@ -322,6 +335,20 @@ func TestUnmarshal(t *testing.T) {
 			encoded:    []byte("3.3: test"),
 			decodeInto: new(UnmarshalTaggedStruct),
 			decoded:    UnmarshalTaggedStruct{Float3dot3: "test"},
+		},
+
+		// embedding shenanigans
+		"embedded struct with top level pointer field matching lower field": {
+			encoded:    []byte("a:\n  b: value1"),
+			decodeInto: new(UnmarshalOnlyEmbedStruct),
+			decoded: UnmarshalOnlyEmbedStruct{
+				UnmarshalPointerField: UnmarshalPointerField{
+					A: UnmarshalStruct{
+						B: ptr("value1"),
+					},
+					// B: ptr(""), // <- THIS SHOULD NOT BE SET. Uncomment and the test will pass.
+				},
+			},
 		},
 
 		// decode into string field
